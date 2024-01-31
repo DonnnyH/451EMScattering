@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 def GreensFunc(r1, r2, k, i, j):
     """
-    Electromagetic dyadic greens function in index notation G_{ij},
+    Electromagnetic dyadic greens function in index notation G_{ij},
     r1 - position vector of point 1
     r2 - position vector of point 2
     k - wavevector (we always set=1)
@@ -33,7 +33,7 @@ def GreensFunc(r1, r2, k, i, j):
 
 def GreensMatrix(r1,r2):
     """
-    Electromagetic dyadic greens function in matrix form
+    Electromagnetic dyadic greens function in matrix form
     r1 - position vector of point 1
     r2 - position vector of point 2
     """
@@ -41,7 +41,7 @@ def GreensMatrix(r1,r2):
     if r==0:
         return np.zeros(shape=(3,3), dtype=complex)
     else:
-        G = np.array([[(-1+(3-3j*r)/(r**2))*(r1[0]*r2[0])/(r**2)+(1+(1j*r-1)/(r**2)),(-1+(3-3j*r)/(r**2))*(r1[0]*r2[1])/(r**2), (-1+(3-3j*r)/(r**2))*(r1[0]*r2[2])/(r**2)],[(-1+(3-3j*r)/(r**2))*(r1[1]*r2[0])/(r**2),(-1+(3-3j*r)/(r**2))*(r1[1]*r2[1])/(r**2)+(1+(1j*r-1)/(r**2)),(-1+(3-3j*r)/(r**2))*(r1[1]*r2[2])/(r**2)],[(-1+(3-3j*r)/(r**2))*(r1[2]*r2[0])/(r**2),(-1+(3-3j*r)/(r**2))*(r1[2]*r2[1])/(r**2),(-1+(3-3j*r)/(r**2))*(r1[2]*r2[2])/(r**2)+(1+(1j*r-1)/(r**2))]])
+        G = np.exp(1j*r)/(2*r)*np.array([[(-1+(3-3j*r)/(r**2))*(r1[0]*r2[0])/(r**2)+(1+(1j*r-1)/(r**2)),(-1+(3-3j*r)/(r**2))*(r1[0]*r2[1])/(r**2), (-1+(3-3j*r)/(r**2))*(r1[0]*r2[2])/(r**2)],[(-1+(3-3j*r)/(r**2))*(r1[1]*r2[0])/(r**2),(-1+(3-3j*r)/(r**2))*(r1[1]*r2[1])/(r**2)+(1+(1j*r-1)/(r**2)),(-1+(3-3j*r)/(r**2))*(r1[1]*r2[2])/(r**2)],[(-1+(3-3j*r)/(r**2))*(r1[2]*r2[0])/(r**2),(-1+(3-3j*r)/(r**2))*(r1[2]*r2[1])/(r**2),(-1+(3-3j*r)/(r**2))*(r1[2]*r2[2])/(r**2)+(1+(1j*r-1)/(r**2))]])
         return G
 
 def polarisation(i, sigma):
