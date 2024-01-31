@@ -94,7 +94,7 @@ def LG_intensity(r,z,theta, l, p, z_r, w0):
 l=0
 p=0
 z_r=125
-w0=0.3*0.2*np.sqrt(5)
+w0=0.3*0.2*np.sqrt(10)
 
 
 def ScatteringMatrix(R):
