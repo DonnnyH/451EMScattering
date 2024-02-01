@@ -70,16 +70,16 @@ def polarisation(i, sigma):
         else: 
             return 0
 
-def LG_intensity(r,z,theta, l, p, z_r, w0):
+def LG_intensity(r,z,theta, l, p, w0):
     """
     Electric field pattern of a laguerre-gaussian laser beam (without polarisation)
     r - radius from beam axis
     z - distance along beam axis
     l - azimuthal index
     p - radial index
-    z_r - rayleigh range
     w0 - beam waist
     """
+    z_r=np.pi*w0**2
     def w(z):
         return w0*np.sqrt(1+(z/z_r)**2)
     def R(z):
@@ -93,8 +93,7 @@ def LG_intensity(r,z,theta, l, p, z_r, w0):
 
 l=0
 p=0
-z_r=125
-w0=0.3*0.2*np.sqrt(10)
+w0=1
 
 
 def ScatteringMatrix(R):
@@ -110,7 +109,7 @@ def ScatteringMatrix(R):
         z = R[i//3][2]
         r = np.sqrt(x**2+y**2)
         theta = np.arctan2(y,x)
-        E[i]=(LG_intensity(r,z,theta,l,p,z_r,w0))*polarisation(i,0)
+        E[i]=(LG_intensity(r,z,theta,l,p,w0))*polarisation(i,0)
     for i in range(3*n):
         for j in range(3*n):
             G[i][j]=(GreensFunc(R[(i)//3],R[(j)//3], 1, (i)%3, (j)%3))
@@ -120,15 +119,15 @@ def ScatteringMatrix(R):
     return np.array_split(E1,n)
  
 
-def LG_intensity_Scat(E, R,r,z,theta, l, p, z_r, w0, x, y):
+def LG_intensity_Scat(E, R,r,z,theta, l, p, w0, x, y):
     """
     Computes the field after the scattering solution has been solved by including the induced fields of the dipoles
     """
-    E0 = np.array([LG_intensity(r,z,theta, l, p, z_r, w0),0,0], dtype=complex)
+    E0 = np.array([LG_intensity(r,z,theta, l, p, w0),0,0], dtype=complex)
     q = np.array([x,y,z])
     for i in range(len(R)):
         E0 = E0+3j*GreensMatrix(R[i],q)*E[i]
-    I=np.real(np.linalg.norm(E0))**2
+    I=np.real(np.linalg.norm(E0))
     if I>=1:
         return 1
     return I
@@ -155,7 +154,7 @@ def square_array(N, space):
     return R
 
 
-R=square_array(10, a)
+R=square_array(20, a)
 Escat = ScatteringMatrix(R)
 
 
@@ -165,7 +164,7 @@ for i in range(1000):
     for j in range(1000):
         r = np.sqrt(x**2+y**2)
         theta = 0
-        I=(LG_intensity_Scat(Escat, R, r,z, theta, l, p, z_r, w0, x, 0))
+        I=(LG_intensity_Scat(Escat, R, r,z, theta, l, p, w0, x, 0))
         pos[i][j]=I
         z = z+ 20/1000
     x = x + 20/1000
