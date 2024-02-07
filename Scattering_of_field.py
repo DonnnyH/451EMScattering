@@ -43,6 +43,45 @@ def GreensMatrix(r1,r2):
     else:
         G = np.exp(1j*r)/(2*r)*np.array([[(-1+(3-3j*r)/(r**2))*(r1[0]*r2[0])/(r**2)+(1+(1j*r-1)/(r**2)),(-1+(3-3j*r)/(r**2))*(r1[0]*r2[1])/(r**2), (-1+(3-3j*r)/(r**2))*(r1[0]*r2[2])/(r**2)],[(-1+(3-3j*r)/(r**2))*(r1[1]*r2[0])/(r**2),(-1+(3-3j*r)/(r**2))*(r1[1]*r2[1])/(r**2)+(1+(1j*r-1)/(r**2)),(-1+(3-3j*r)/(r**2))*(r1[1]*r2[2])/(r**2)],[(-1+(3-3j*r)/(r**2))*(r1[2]*r2[0])/(r**2),(-1+(3-3j*r)/(r**2))*(r1[2]*r2[1])/(r**2),(-1+(3-3j*r)/(r**2))*(r1[2]*r2[2])/(r**2)+(1+(1j*r-1)/(r**2))]])
         return G
+    
+def GreensMatrix2(r1,r2):
+    """
+    Electromagnetic dyadic greens function in matrix form
+    r1 - position vector of point 1
+    r2 - position vector of point 2
+    """
+    k=2*np.pi
+    r = np.linalg.norm(r1 - r2)
+    rel = (r1-r2)/r
+    if r==0:
+        return np.zeros(shape=(3,3), dtype=complex)
+    else:
+        return np.exp(1j*k*r)*((1/(k*r)+1j/(k*r)**2-1/(k*r)**3)*np.eye(3)-(1/(k*r)+3j/(k*r)**2-3/(k*r)**3)*np.outer(rel,rel))
+    
+def GreensMatrix3(r1,r2,d):
+    """
+    Electromagnetic dyadic greens function in matrix form
+    r1 - position vector of point 1
+    r2 - position vector of point 2
+    """
+    k=2*np.pi
+    r = np.linalg.norm(r1 - r2)
+    rel = (r1-r2)/r
+    if r==0:
+        return np.zeros(shape=(3,3), dtype=complex)
+    else:
+        return np.exp(1j*k*r)/(k*r)*(np.cross(np.cross(rel, d), d)+(3*np.dot(rel, d)*rel-d)*(1/(k*r)**2-1j/(k*r)))
+
+def GreenMatrixElements(r1,r2,i,j):
+    unitv1 = np.zeros(shape=(1,3), dtype=complex)
+    unitv2 = np.zeros(shape=(1,3), dtype=complex)
+    unitv1[i]=1
+    unitv2[j]=1
+    return np.dot(unitv2 GreensMatrix3(r1,r2, unitv1))
+    
+    
+    
+    
 
 def polarisation(i, sigma):
     """
@@ -83,12 +122,17 @@ def LG_intensity(r,z,theta, l, p, w0):
     def w(z):
         return w0*np.sqrt(1+(z/z_r)**2)
     def R(z):
-        return z*(1+(z_r/z)**2)
+        if z==0:
+            return np.inf
+        else:
+            return z*(1+(z_r/z)**2)
     def G(z):
         return (np.abs(l)+2*p+1)*np.arctan(z/z_r)
-    phase = np.exp(1j*(l*theta + G(z) - r**2/(2*R(z))-z))
+    phase = np.exp(1j*(l*theta + G(z) - 2*np.pi*r**2/(2*R(z))-2*np.pi*z))
     E=np.sqrt(2*np.math.factorial(p)/(np.pi*np.math.factorial(p+np.abs(l))))*(w0/w(z))*(np.sqrt(2)*r/w(z))**(np.abs(l))*sp.eval_genlaguerre(p,np.abs(l), (2*r**2/w(z)))*np.exp(-r**2/(w(z)**2))*phase
     return E
+
+
 
 
 l=0
@@ -112,8 +156,8 @@ def ScatteringMatrix(R):
         E[i]=(LG_intensity(r,z,theta,l,p,w0))*polarisation(i,0)
     for i in range(3*n):
         for j in range(3*n):
-            G[i][j]=(GreensFunc(R[(i)//3],R[(j)//3], 1, (i)%3, (j)%3))
-    M = np.eye(3*n, dtype=complex)-3j*G
+            G[i][j]=GreensMatrix2(R[(i)//3], R[(j)//3])[i%3][j%3]
+    M = np.eye(3*n, dtype=complex)-3j/2*G
     In = np.linalg.inv(M)
     E1 = In@E
     return np.array_split(E1,n)
@@ -126,8 +170,8 @@ def LG_intensity_Scat(E, R,r,z,theta, l, p, w0, x, y):
     E0 = np.array([LG_intensity(r,z,theta, l, p, w0),0,0], dtype=complex)
     q = np.array([x,y,z])
     for i in range(len(R)):
-        E0 = E0+3j*GreensMatrix(R[i],q)*E[i]
-    I=np.real(np.linalg.norm(E0))
+        E0 = E0+3j/2*GreensMatrix2(R[i],q)*E[i]
+    I=np.linalg.norm(E0)**2
     if I>=1:
         return 1
     return I
@@ -137,8 +181,12 @@ x=-10
 y=0
 z=-10
 
+"""
+Precision of grid, mxm grid
+"""
+m=100
 
-pos = np.zeros(shape=(1000,1000), dtype=complex)
+pos = np.zeros(shape=(m,m), dtype=complex)
 
 
 a=0.2
@@ -150,28 +198,35 @@ def square_array(N, space):
     a=space/2
     for i in range(N):
         for j in range(N):
-            R.append(np.array([-(N*a)+2*a*i+a,-(N*a)+2*a*j+a, 0.00001]))
+            R.append(np.array([-(N*a)+2*a*i+a,-(N*a)+2*a*j+a, 0]))
     return R
 
+def atom_plotter(N, space):
+    a=space/2
+    R=[]
+    for i in range(N):
+        R.append(np.array([0,-(N*a)+2*a*i+a]))
+    return R
+    
 
-R=square_array(20, a)
+R=square_array(25, a)
 Escat = ScatteringMatrix(R)
 
 
 
-for i in range(1000):
+for i in range(m):
     z = -10
-    for j in range(1000):
+    for j in range(m):
         r = np.sqrt(x**2+y**2)
         theta = 0
         I=(LG_intensity_Scat(Escat, R, r,z, theta, l, p, w0, x, 0))
         pos[i][j]=I
-        z = z+ 20/1000
-    x = x + 20/1000
+        z = z+ 20/m
+    x = x + 20/m
 
 
-xlist = np.linspace(-10,10,1000)
-zlist = np.linspace(-10,10,1000)
+xlist = np.linspace(-10,10,m)
+zlist = np.linspace(-10,10,m)
 X, Z = np.meshgrid(zlist, xlist)
 
 
@@ -180,4 +235,5 @@ cp=ax.contourf(X, Z, pos, levels=100, cmap="magma", vmin=0, vmax=1)
 plt.xlabel(r'$z/\lambda$', size=14)
 plt.ylabel(r'$x/\lambda$', size=14)
 cbar = fig.colorbar(cp)
+
 plt.show()
