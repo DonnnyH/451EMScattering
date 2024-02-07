@@ -66,18 +66,30 @@ def GreensMatrix3(r1,r2,d):
     """
     k=2*np.pi
     r = np.linalg.norm(r1 - r2)
-    rel = (r1-r2)/r
     if r==0:
         return np.zeros(shape=(3,3), dtype=complex)
     else:
-        return np.exp(1j*k*r)/(k*r)*(np.cross(np.cross(rel, d), d)+(3*np.dot(rel, d)*rel-d)*(1/(k*r)**2-1j/(k*r)))
+        rel = (r1-r2)/r
+        return np.exp(1j*k*r)/(k*r)*((-np.dot(rel, d)*rel+np.dot(rel,rel)*d)+(3*np.dot(rel, d)*rel-d)*(1/(k*r)**2-1j/(k*r)))
+    
+def GreensMatrix4(r1,r2):
+    k=2*np.pi
+    r = np.linalg.norm(r1 - r2)
+    if r==0:
+        return np.zeros(shape=(3,3), dtype=complex)
+    else:
+        rel = (r1-r2)/r
+        return np.exp(1j*k*r)/(k*r)*((np.eye(3)-np.outer(rel,rel))+(1j/(k*r)-1/(k*r)**2)*(np.eye(3)-3*np.outer(rel,rel)))
 
-def GreenMatrixElements(r1,r2,i,j):
-    unitv1 = np.zeros(shape=(1,3), dtype=complex)
-    unitv2 = np.zeros(shape=(1,3), dtype=complex)
+def GreensMatrixElements(r1,r2,i,j):
+    unitv1 = np.array([0+0j,0+0j,0+0j])
+    unitv2 = np.array([0+0j,0+0j,0+0j])
     unitv1[i]=1
     unitv2[j]=1
-    return np.dot(unitv2 GreensMatrix3(r1,r2, unitv1))
+    if np.linalg.norm(r1-r2)==0:
+        return 0
+    else:
+        return np.dot(unitv2, GreensMatrix3(r1,r2, unitv1))
     
     
     
@@ -156,7 +168,7 @@ def ScatteringMatrix(R):
         E[i]=(LG_intensity(r,z,theta,l,p,w0))*polarisation(i,0)
     for i in range(3*n):
         for j in range(3*n):
-            G[i][j]=GreensMatrix2(R[(i)//3], R[(j)//3])[i%3][j%3]
+            G[i][j]=GreensMatrix4(R[(i)//3], R[(j)//3])[i%3][j%3]
     M = np.eye(3*n, dtype=complex)-3j/2*G
     In = np.linalg.inv(M)
     E1 = In@E
@@ -167,11 +179,11 @@ def LG_intensity_Scat(E, R,r,z,theta, l, p, w0, x, y):
     """
     Computes the field after the scattering solution has been solved by including the induced fields of the dipoles
     """
-    E0 = np.array([LG_intensity(r,z,theta, l, p, w0),0,0], dtype=complex)
+    E0 = np.array([[LG_intensity(r,z,theta, l, p, w0)],[0],[0]], dtype=complex)
     q = np.array([x,y,z])
     for i in range(len(R)):
-        E0 = E0+3j/2*GreensMatrix2(R[i],q)*E[i]
-    I=np.linalg.norm(E0)**2
+        E0 = E0+3j/2*GreensMatrix4(R[i],q)@ E[i]
+    I=np.abs(np.real(E0[0]))
     if I>=1:
         return 1
     return I
@@ -209,7 +221,7 @@ def atom_plotter(N, space):
     return R
     
 
-R=square_array(25, a)
+R=square_array(10, a)
 Escat = ScatteringMatrix(R)
 
 
