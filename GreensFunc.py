@@ -144,7 +144,7 @@ for i in range(m):
     z = -10
     for j in range(m):
         r = np.sqrt(x**2+y**2)
-        theta = 0
+        theta = np.arctan2(y,x)
         I=(LG_intensity_Scat(Escat, R, r,z, theta, l, p, w0, x, 0))
         pos[i][j]=I
         z = z+ 20/m
