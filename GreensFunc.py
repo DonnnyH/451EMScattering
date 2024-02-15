@@ -71,8 +71,17 @@ def LG_intensity(r,z,theta, l, p, w0):
     def G(z):
         return (np.abs(l)+2*p+1)*np.arctan(z/z_r)
     phase = np.exp(1j*(l*theta - G(z) + 2*np.pi*r**2/(2*R(z))+2*np.pi*z))
-    E=np.sqrt(2*np.math.factorial(p)/(np.pi*np.math.factorial(p+np.abs(l))))*(w0/w(z))*(np.sqrt(2)*r/w(z))**(np.abs(l))*sp.eval_genlaguerre(p,np.abs(l), (2*r**2/w(z)))*np.exp(-r**2/(w(z)**2))*phase
-    return E
+    E=np.sqrt(2*np.math.factorial(p)/(np.pi*np.math.factorial(p+np.abs(l))))*(w0/w(z))*(np.sqrt(2)*r/w(z))**(np.abs(l))*sp.eval_genlaguerre(p,np.abs(l), (2*r**2/w(z)**2))*np.exp(-r**2/(w(z)**2))*phase
+    def normalisation(l,p,w0):
+        """
+        Provided that the beam is a 'doughnut' LG beam (p=0) then this function normalises the beams intensity at its maximum (r=sqrt(l/2)*w0, z=0)
+        """
+        if p==0:
+            E0=np.sqrt(2*np.math.factorial(p)/(np.pi*np.math.factorial(p+np.abs(l))))*(w0/w(0))*(np.sqrt(2)*(np.sqrt(np.abs(l))*w0/np.sqrt(2))/w(0))**(np.abs(l))*sp.eval_genlaguerre(p,np.abs(l), (2*(np.sqrt(np.abs(l))*w0/np.sqrt(2))**2/w(0)**2))*np.exp(-(np.sqrt(np.abs(l))*w0/np.sqrt(2))**2/(w(0)**2))
+        else:
+            E0=1
+        return E0
+    return E/normalisation(l,p,w0)
 
 def square_array(N, d):
     """
@@ -104,9 +113,12 @@ def ScatteringMatrix(R, l, p, w0):
         for j in range(3*n):
             G[i][j]=GreensFunc(R[(i)//3], R[(j)//3])[i%3][j%3]
     M = np.eye(3*n, dtype=complex)-3j/2*G
-    In = np.linalg.inv(M)
-    E1 = In@E
-    return np.array_split(E1,n)
+    if n==0:
+        return np.array([[0],[0],[0]])
+    else:
+        In = np.linalg.inv(M)
+        E1 = In@E
+        return np.array_split(E1,n)
 
 def LG_intensity_Scat(E, R,r,z,theta, l, p, w0, x, y):
     """
@@ -114,15 +126,66 @@ def LG_intensity_Scat(E, R,r,z,theta, l, p, w0, x, y):
     """
     E0 = np.array([[LG_intensity(r,z,theta, l, p, w0)],[0],[0]], dtype=complex)
     q = np.array([x,y,z])
-    for i in range(len(R)):
-        E0 = E0+3j/2*GreensFunc(R[i],q)@ E[i]
+    if len(R)==0:
+        E0=E0
+    else:
+        for i in range(len(R)):
+            E0 = E0+3j/2*GreensFunc(R[i],q)@ E[i]
     I=np.linalg.norm(E0)**2
-    if I>=4:
-        I=4
+    if I>=1:
+        I=1
     return I
 
-
-
+def reflectivity(R, acc, l, p, w0):
+    """
+    Computes the reflectivity of the array under excitation by taking the quotient of the integral of the scattered field for z>0 over the solid angle of the hemisphere to the integral of the incident field for z<0 over the solid angle of the hemisphere
+    To compute the integral over the spheres, we calculate the field at discrete points over the hemisphere and apply the Lebedev quadrature
+    int(f(\omega), d\omega)=2pi/N*sum(f(\omega_i)),
+    where N is the number of grid points
+    See https://en.wikipedia.org/wiki/Lebedev_quadrature
+    """
+    def normvect(thet, phi):
+        """
+        Unit Vector of normal to sphere
+        thet - azimuthal angle [0,2*pi)
+        phi - polar angle [0, pi)
+        """
+        return np.array([[np.sin(thet)*np.cos(phi)],[np.sin(thet)*np.sin(phi)],[np.cos(thet)]])
+    Escat = ScatteringMatrix(R, l, p, w0)
+    
+    phi=0
+    rad = 1
+    refl = []
+    for i in range(acc):
+        thet = 0.01
+        for i in range(acc):
+            x = rad*np.sin(thet)*np.cos(phi)
+            y = rad*np.sin(thet)*np.sin(phi)
+            z= rad*np.cos(thet)
+            r = np.sqrt(x**2+y**2)
+            theta = np.arctan2(y,x)
+            refl.append(np.dot(normvect(thet, phi),LG_intensity_Scat(Escat, R, r,z, theta, l, p, w0, x, y)))
+            thet = thet + (np.pi-0.01)/(2*acc)
+        phi = phi + 2*np.pi/acc
+    ref = np.abs(np.sum(refl))**2   
+        
+    phi=0
+    inc = []
+    for i in range(acc):
+        thet = (np.pi+0.01)/2
+        for i in range(acc):
+            x = rad*np.sin(thet)*np.cos(phi)
+            y= rad*np.sin(thet)*np.sin(phi)
+            z= rad*np.cos(thet)
+            r = np.sqrt(x**2+y**2)
+            theta = np.arctan2(y,x)
+            inc.append(np.dot(normvect(thet, phi),np.array(LG_intensity(r, z, theta, l, p, w0))))
+            thet = thet + (np.pi-0.01)/(2*acc)
+        phi = phi + 2*np.pi/acc
+    incident =np.abs(np.sum(inc))**2
+    return ref, incident
+    
+"""       
 N=20
 a=0.2
 R=square_array(N, a)
@@ -130,7 +193,6 @@ R=square_array(N, a)
 l=0
 p=0
 w0=0.3*a*N
-
 Escat = ScatteringMatrix(R, l, p, w0)
 
 
@@ -163,7 +225,8 @@ plt.ylabel(r'$x/\lambda$', size=14)
 cbar = fig.colorbar(cp)
 
 plt.show()
-
+"""
+"""
 Z1= np.linspace(-5,-0.1, 1000)
 X=0
 Y=0
@@ -195,8 +258,34 @@ plt.xlabel(r'z', size=14)
 plt.ylabel(r'$|E/E_{0}|^2$', size=14)
 plt.title(r'20x20 atomic array with $a=0.5\lambda$ under Gaussian Beam', size=10)
 plt.show()
+"""
+
+a=np.linspace(0.15,1, 25)
+reflc=[]
+N=20
+l=0
+p=0
+
+for i in range(len(a)):
+    R=square_array(N, a[i])
+    w0=0.3*a[i]*N
+    Escat = ScatteringMatrix(R, l, p, w0)
+    x=0.2*a[i]
+    y=0*a[i]
+    z=2.5
+    r = np.sqrt(x**2+y**2)
+    theta = np.arctan2(y,x)
+    I=(LG_intensity_Scat(Escat, R, r, z, theta, l, p, w0, x, y))/(np.abs(LG_intensity(r, z, theta, l, p, w0))**2)
+    reflc.append(I)
+    
+plt.plot(a,reflc)
+plt.show()
 
     
+    
+    
+    
+
     
 
 
