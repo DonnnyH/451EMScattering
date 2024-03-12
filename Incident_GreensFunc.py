@@ -37,7 +37,7 @@ def polarisation(i, sigma, incident):
     if sigma==0:
         if (i)%3==0:
             return np.cos(incident)
-        elif (i)%3==2:
+        elif (i)%3==1:
          return -np.sin(incident)
         else:
             return 0
